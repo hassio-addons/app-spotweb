@@ -1,0 +1,140 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Spotweb
+# Sets up Spotweb before the server starts
+# ==============================================================================
+declare admin_password
+declare fresh_install
+declare password_hash
+declare timezone
+
+readonly SPOTWEB_DIR="/var/www/spotweb"
+readonly DATABASE="/data/spotweb.db"
+readonly PASSWORD_STAMP="/data/.admin-password"
+
+# ==============================================================================
+# Sets the password of Spotweb's admin account.
+# ==============================================================================
+set_admin_password() {
+    if ! SPOTWEB_ADMIN_PASSWORD="${1}" \
+        php84 /usr/share/spotweb/set-admin-password.php;
+    then
+        bashio::exit.nok "Setting the password of the admin account failed!"
+    fi
+}
+
+# Has to be answered before anything opens the database, since merely
+# connecting to SQLite already creates the file.
+fresh_install=false
+if ! bashio::fs.file_exists "${DATABASE}"; then
+    fresh_install=true
+fi
+
+# Spotweb resolves its cache_path against its own root, and bin/upgrade-db.php
+# strips the leading "./" off that setting when it clears the cache. Pointing
+# the setting straight at /data would break those scripts, so the default
+# location is kept and symlinked to persistent storage instead.
+mkdir -p /data/cache
+rm -f -r "${SPOTWEB_DIR}/cache"
+ln -s /data/cache "${SPOTWEB_DIR}/cache"
+
+# Spotweb writes this from its installation wizard. This app configures
+# Spotweb itself, so the file is generated here and the wizard stays closed.
+bashio::log.debug "Writing database settings..."
+cat > "${SPOTWEB_DIR}/dbsettings.inc.php" <<EOT
+<?php
+
+\$dbsettings['engine'] = 'pdo_sqlite';
+\$dbsettings['host'] = '';
+\$dbsettings['dbname'] = '${DATABASE}';
+\$dbsettings['user'] = '';
+\$dbsettings['pass'] = '';
+EOT
+chmod 600 "${SPOTWEB_DIR}/dbsettings.inc.php"
+
+# PHP falls back to UTC whenever date.timezone is unset, no matter what the
+# rest of the container is set to, which would date every spot in UTC.
+timezone="UTC"
+if bashio::var.has_value "${TZ:-}"; then
+    timezone="${TZ}"
+fi
+bashio::log.debug "Setting the PHP timezone to ${timezone}..."
+echo "date.timezone = ${timezone}" > /etc/php84/conf.d/99-timezone.ini
+
+if ! php84 /usr/share/spotweb/check-install.php; then
+    if bashio::var.true "${fresh_install}"; then
+        bashio::log.info "Creating the Spotweb database, this may take a while..."
+    else
+        bashio::log.info "Upgrading the Spotweb database..."
+    fi
+
+    # A brand new database takes more than one pass. The first creates the
+    # schema, and only once those tables exist can the settings and security
+    # versions be stored, which is what Spotweb checks before serving a page.
+    # So this runs until Spotweb reports itself ready, instead of assuming a
+    # fixed number of passes.
+    for _ in 1 2 3; do
+        if ! php84 "${SPOTWEB_DIR}/bin/upgrade-db.php"; then
+            bashio::exit.nok "Setting up the Spotweb database failed!"
+        fi
+
+        if php84 /usr/share/spotweb/check-install.php; then
+            break
+        fi
+
+        bashio::log.debug "The database needs another upgrade pass..."
+    done
+
+    if ! php84 /usr/share/spotweb/check-install.php; then
+        bashio::exit.nok \
+            "The Spotweb database did not reach a usable state." \
+            "Please report this at" \
+            "https://github.com/hassio-addons/app-spotweb/issues"
+    fi
+fi
+
+admin_password=""
+if bashio::config.has_value 'admin_password'; then
+    admin_password=$(bashio::config 'admin_password')
+fi
+
+if bashio::var.true "${fresh_install}"; then
+    # bin/upgrade-db.php creates the users before it creates the settings, and
+    # the password salt is one of those settings. So on a brand new database
+    # the admin account is hashed against a salt that does not exist yet, and
+    # no password matches it afterwards. Spotweb's own installation wizard
+    # avoids this by creating the settings first; setting the password once
+    # the salt is in place repairs it here.
+    if bashio::var.has_value "${admin_password}"; then
+        bashio::log.info "Setting the password of the admin account..."
+    else
+        admin_password="admin"
+        bashio::log.warning
+        bashio::log.warning "Spotweb is using its default credentials:"
+        bashio::log.warning "username 'admin', password 'admin'."
+        bashio::log.warning "Please change them, either from within Spotweb"
+        bashio::log.warning "or by setting the 'admin_password' option."
+        bashio::log.warning
+    fi
+
+    set_admin_password "${admin_password}"
+fi
+
+if bashio::var.has_value "${admin_password}" \
+    && bashio::config.has_value 'admin_password';
+then
+    # Applying this on every start would undo a password changed from within
+    # Spotweb itself, so it is only applied when the configured value differs
+    # from the one applied last. Only a hash of it is stored.
+    password_hash=$(printf '%s' "${admin_password}" | sha256sum | cut -d ' ' -f 1)
+    if [[ "$(cat "${PASSWORD_STAMP}" 2>/dev/null)" != "${password_hash}" ]]; then
+        if bashio::var.false "${fresh_install}"; then
+            bashio::log.info "Setting the password of the admin account..."
+            set_admin_password "${admin_password}"
+        fi
+
+        echo "${password_hash}" > "${PASSWORD_STAMP}"
+        chmod 600 "${PASSWORD_STAMP}"
+    fi
+fi

@@ -1,0 +1,44 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Community App: Spotweb
+# Periodically retrieves new spots from the configured usenet server
+# ==============================================================================
+declare interval
+declare reported_unconfigured
+
+interval=$(bashio::config 'retrieve_interval' 15)
+
+if [[ "${interval}" -eq 0 ]]; then
+    bashio::log.info "Automatic retrieval of spots is disabled"
+    # A longrun may not exit, so park this service for the lifetime of the
+    # container. s6-pause does that while still honouring signals.
+    exec /command/s6-pause
+fi
+
+bashio::log.info "Retrieving new spots every ${interval} minute(s)..."
+
+reported_unconfigured=false
+while true; do
+    if php84 /usr/share/spotweb/check-nntp.php; then
+        reported_unconfigured=false
+        bashio::log.info "Retrieving new spots..."
+
+        # Retrieval fails for reasons a later run recovers from on its own, an
+        # unreachable usenet server most of all, so a failure must not take
+        # the app down with it.
+        if ! php84 /var/www/spotweb/retrieve.php; then
+            bashio::log.warning \
+                "Retrieving spots failed, retrying in ${interval} minute(s)."
+        fi
+    elif bashio::var.false "${reported_unconfigured}"; then
+        # Said once, rather than every interval, until a server shows up.
+        reported_unconfigured=true
+        bashio::log.notice \
+            "No usenet server is configured in Spotweb yet, so there is" \
+            "nothing to retrieve. Open Spotweb, log in as admin, and fill" \
+            "out the usenet server in its settings."
+    fi
+
+    sleep "$((interval * 60))"
+done
