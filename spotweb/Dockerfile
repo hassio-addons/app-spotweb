@@ -14,28 +14,28 @@ ARG SPOTWEB_VERSION="412993dda5de9cc34e524ff816d18d74be493c05"
 RUN \
     apk add --no-cache \
         nginx=1.30.4-r1 \
-        php84-ctype=8.4.25-r0 \
-        php84-curl=8.4.25-r0 \
-        php84-dom=8.4.25-r0 \
-        php84-fileinfo=8.4.25-r0 \
-        php84-fpm=8.4.25-r0 \
-        php84-gd=8.4.25-r0 \
-        php84-gettext=8.4.25-r0 \
-        php84-gmp=8.4.25-r0 \
-        php84-iconv=8.4.25-r0 \
-        php84-intl=8.4.25-r0 \
-        php84-mbstring=8.4.25-r0 \
-        php84-opcache=8.4.25-r0 \
-        php84-openssl=8.4.25-r0 \
-        php84-pdo=8.4.25-r0 \
-        php84-pdo_sqlite=8.4.25-r0 \
-        php84-session=8.4.25-r0 \
-        php84-simplexml=8.4.25-r0 \
-        php84-xml=8.4.25-r0 \
-        php84-xmlreader=8.4.25-r0 \
-        php84-xmlwriter=8.4.25-r0 \
-        php84-zip=8.4.25-r0 \
-        php84=8.4.25-r0 \
+        php84-ctype=8.4.26-r0 \
+        php84-curl=8.4.26-r0 \
+        php84-dom=8.4.26-r0 \
+        php84-fileinfo=8.4.26-r0 \
+        php84-fpm=8.4.26-r0 \
+        php84-gd=8.4.26-r0 \
+        php84-gettext=8.4.26-r0 \
+        php84-gmp=8.4.26-r0 \
+        php84-iconv=8.4.26-r0 \
+        php84-intl=8.4.26-r0 \
+        php84-mbstring=8.4.26-r0 \
+        php84-opcache=8.4.26-r0 \
+        php84-openssl=8.4.26-r0 \
+        php84-pdo=8.4.26-r0 \
+        php84-pdo_sqlite=8.4.26-r0 \
+        php84-session=8.4.26-r0 \
+        php84-simplexml=8.4.26-r0 \
+        php84-xml=8.4.26-r0 \
+        php84-xmlreader=8.4.26-r0 \
+        php84-xmlwriter=8.4.26-r0 \
+        php84-zip=8.4.26-r0 \
+        php84=8.4.26-r0 \
     \
     && mkdir -p /var/www/spotweb \
     && curl -J -L -o /tmp/spotweb.tar.gz \
