@@ -13,7 +13,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG SPOTWEB_VERSION="412993dda5de9cc34e524ff816d18d74be493c05"
 RUN \
     apk add --no-cache \
-        nginx=1.30.4-r1 \
+        nginx=1.30.6-r0 \
         php84-ctype=8.4.27-r0 \
         php84-curl=8.4.27-r0 \
         php84-dom=8.4.27-r0 \
