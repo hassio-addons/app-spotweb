@@ -10,7 +10,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # branch has been dormant since February 2025. All development happens on the
 # develop branch, so we track that, pinned to an exact commit for reproducible
 # builds. Renovate bumps the digest.
-ARG SPOTWEB_VERSION="25b714e94a9e17625814ac99d02b41c36ae60337"
+ARG SPOTWEB_VERSION="8e971cd44706660c82ec356f67dd36b47009674f"
 RUN \
     apk add --no-cache \
         nginx=1.30.8-r0 \
